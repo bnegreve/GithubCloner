@@ -256,7 +256,18 @@ class getReposURLs(object):
         return(URLs)
 
 
-def cloneRepo(URL, cloningpath, username=None, token=None):
+def parseGitURL(URL, username=None, token=None):
+    """
+    This function parses the GIT URL.
+    """
+
+    URL = URL.replace("git://", "https://")
+    if (username or token) is not None:
+        URL = URL.replace("https://", "https://{}:{}@".format(username, token))
+    return(URL)
+
+
+def cloneRepo(URL, cloningpath, username=None, token=None, no_prefix=False):
     """
     Clones a single GIT repository.
     Input:-
@@ -274,14 +285,20 @@ def cloneRepo(URL, cloningpath, username=None, token=None):
         except Exception as e:
             print("There was an error ", str(e))
             pass
-        URL = URL.replace("git://", "https://")
-        if (username or token) is not None:
-            URL = URL.replace("https://", "https://{}:{}@".format(username, token))
+        URL = parseGitURL(URL, username=username, token=token)
+
         repopath = URL.split("/")[-2] + "_" + URL.split("/")[-1]
+        URL = URL.replace("git://", "https://")
+        if no_prefix:
+            repopath = URL.split("/")[-1]
+        else:
+            repopath = URL.split("/")[-2] + "_" + URL.split("/")[-1]
+
         if repopath.endswith(".git"):
             repopath = repopath[:-4]
         if '@' in repopath:
             repopath = repopath.replace(repopath[:repopath.index("@") + 1], "")
+
         fullpath = cloningpath + "/" + repopath
         with threading.Lock():
             print(fullpath)
@@ -294,7 +311,7 @@ def cloneRepo(URL, cloningpath, username=None, token=None):
         print("Error: There was an error in cloning [{}]".format(URL), str(e))
 
 
-def cloneBulkRepos(URLs, cloningPath, threads_limit=5, username=None, token=None):
+def cloneBulkRepos(URLs, cloningPath, threads_limit=5, username=None, token=None, no_prefix=False):
     """
     Clones a bulk of GIT repositories.
     Input:-
@@ -309,19 +326,18 @@ def cloneBulkRepos(URLs, cloningPath, threads_limit=5, username=None, token=None
     Q = queue.Queue()
     threads_state = []
     for URL in URLs:
-        cloneRepo(URL, cloningPath, username, token)
-    #     Q.put(URL)
-    # while Q.empty() is False:        
-    #     if (threading.active_count() < (threads_limit + 1)):
-    #         t = threading.Thread(target=cloneRepo, args=(Q.get(), cloningPath,), kwargs={"username": username, "token": token})
-    #         t.daemon = True
-    #         t.start()
-    #     else:
-    #         time.sleep(0.5)
+        Q.put(URL)
+    while Q.empty() is False:
+        if (threading.active_count() < (threads_limit + 1)):
+            t = threading.Thread(target=cloneRepo, args=(Q.get(), cloningPath,), kwargs={"username": username, "token": token, 'no_prefix': no_prefix})
+            t.daemon = True
+            t.start()
+        else:
+            time.sleep(0.5)
 
-    #         threads_state.append(t)
-    # for _ in threads_state:
-    #     _.join()
+            threads_state.append(t)
+    for _ in threads_state:
+         _.join()
 
 
 def main():
@@ -372,6 +388,10 @@ def main():
                         dest="prefix",
                         help="Clone only repository whose name starts with this prefix",
                         action='store')
+    parser.add_argument("--no-prefix",
+                        dest="no_prefix",
+                        help="Removes the organization name prefix from repo directory. Example: /Netflix_repo-name --> /repo-name",
+                        action='store_true')
     args = parser.parse_args()
 
     users = args.users if args.users else None
@@ -384,6 +404,7 @@ def main():
     include_gists = args.include_gists if args.include_gists else False
     echo_urls = args.echo_urls if args.echo_urls else False
     prefix = args.prefix if args.prefix else None
+    no_prefix = args.no_prefix if args.no_prefix else False
 
     if threads_limit > 10:
         print("Error: Using more than 10 threads may cause errors.\nDecrease the amount of used threads.")
@@ -453,11 +474,11 @@ def main():
 
     URLs = list(set(URLs))
     if echo_urls is True:
-        for _ in URLs:
-            print(_)
+        for URL in URLs:
+            print(parseGitURL(URL, username=username, token=token))
         return
 
-    cloneBulkRepos(URLs, output_path, threads_limit=threads_limit, username=username, token=token)
+    cloneBulkRepos(URLs, output_path, threads_limit=threads_limit, username=username, token=token, no_prefix=no_prefix)
 
 
 if (__name__ == "__main__"):

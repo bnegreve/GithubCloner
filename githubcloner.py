@@ -122,7 +122,7 @@ class getReposURLs(object):
             current_page += 1
         return(URLs)
 
-    def fromOrg(self, org_name, username=None, token=None):
+    def fromOrg(self, org_name, username=None, token=None, prefix=None):
         """
         Retrieves a list of repositories for a Github organization.
         Input:-
@@ -147,11 +147,13 @@ class getReposURLs(object):
 
             if self.checkResponse(resp) != 0:
                 return([])
-
             for i in range(len(resp)):
-                URLs.append(resp[i]["git_url"])
+                if prefix is None or resp[i]["name"].startswith(prefix):
+                    #print(resp[i]["name"])
+                    #print(resp[i]["git_url"])
+                    URLs.append(resp[i]["git_url"])
             current_page += 1
-        return(URLs)
+        return(sorted(URLs))
 
     def fromOrgIncludeUsers(self, org_name, username=None, token=None, include_gists=False):
         """
@@ -269,7 +271,8 @@ def cloneRepo(URL, cloningpath, username=None, token=None):
         try:
             if not os.path.exists(cloningpath):
                 os.mkdir(cloningpath)
-        except Exception:
+        except Exception as e:
+            print("There was an error ", str(e))
             pass
         URL = URL.replace("git://", "https://")
         if (username or token) is not None:
@@ -287,8 +290,8 @@ def cloneRepo(URL, cloningpath, username=None, token=None):
             git.Repo(fullpath).remote().pull()
         else:
             git.Repo.clone_from(URL, fullpath)
-    except Exception:
-        print("Error: There was an error in cloning [{}]".format(URL))
+    except Exception as e:
+        print("Error: There was an error in cloning [{}]".format(URL), str(e))
 
 
 def cloneBulkRepos(URLs, cloningPath, threads_limit=5, username=None, token=None):
@@ -306,18 +309,19 @@ def cloneBulkRepos(URLs, cloningPath, threads_limit=5, username=None, token=None
     Q = queue.Queue()
     threads_state = []
     for URL in URLs:
-        Q.put(URL)
-    while Q.empty() is False:
-        if (threading.active_count() < (threads_limit + 1)):
-            t = threading.Thread(target=cloneRepo, args=(Q.get(), cloningPath,), kwargs={"username": username, "token": token})
-            t.daemon = True
-            t.start()
-        else:
-            time.sleep(0.5)
+        cloneRepo(URL, cloningPath, username, token)
+    #     Q.put(URL)
+    # while Q.empty() is False:        
+    #     if (threading.active_count() < (threads_limit + 1)):
+    #         t = threading.Thread(target=cloneRepo, args=(Q.get(), cloningPath,), kwargs={"username": username, "token": token})
+    #         t.daemon = True
+    #         t.start()
+    #     else:
+    #         time.sleep(0.5)
 
-            threads_state.append(t)
-    for _ in threads_state:
-        _.join()
+    #         threads_state.append(t)
+    # for _ in threads_state:
+    #     _.join()
 
 
 def main():
@@ -364,6 +368,10 @@ def main():
                         dest="echo_urls",
                         help="Print gathered URLs only and then exit.",
                         action='store_true')
+    parser.add_argument("-p", "--prefix",
+                        dest="prefix",
+                        help="Clone only repository whose name starts with this prefix",
+                        action='store')
     args = parser.parse_args()
 
     users = args.users if args.users else None
@@ -375,6 +383,7 @@ def main():
     include_authenticated_repos = args.include_authenticated_repos if args.include_authenticated_repos else False
     include_gists = args.include_gists if args.include_gists else False
     echo_urls = args.echo_urls if args.echo_urls else False
+    prefix = args.prefix if args.prefix else None
 
     if threads_limit > 10:
         print("Error: Using more than 10 threads may cause errors.\nDecrease the amount of used threads.")
@@ -438,7 +447,7 @@ def main():
 
         for organization in organizations:
             if include_organization_members is False:
-                URLs.extend(getReposURLs().fromOrg(organization, username=username, token=token))
+                URLs.extend(getReposURLs().fromOrg(organization, username=username, token=token, prefix=prefix))
             else:
                 URLs.extend(getReposURLs().fromOrgIncludeUsers(organization, username=username, token=token, include_gists=include_gists))
 

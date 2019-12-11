@@ -403,16 +403,10 @@ def main():
                         dest="echo_urls",
                         help="Print gathered URLs only and then exit.",
                         action='store_true')
-<<<<<<< HEAD
     parser.add_argument("-p", "--prefix",
                         dest="prefix",
                         help="Clone only repository whose name starts with this prefix",
                         action='store')
-    parser.add_argument("--no-prefix",
-                        dest="no_prefix",
-                        help="Removes the organization name prefix from repo directory. Example: /Netflix_repo-name --> /repo-name",
-                        action='store_true')
-=======
     parser.add_argument("--prefix-mode",
                         dest="prefix_mode",
                         help="Sets the prefix mode for the repo directory. underscore: /Netflix_repo-name, directory: /Netflix/repo-name, none: /repo-name",
@@ -423,7 +417,6 @@ def main():
                         help="Github Enterprise domain to prefix to API calls",
                         action='store',
                         default="https://api.github.com")
->>>>>>> forkorigin/master
     args = parser.parse_args()
 
     users = args.users if args.users else None
@@ -435,13 +428,9 @@ def main():
     include_authenticated_repos = args.include_authenticated_repos if args.include_authenticated_repos else False
     include_gists = args.include_gists if args.include_gists else False
     echo_urls = args.echo_urls if args.echo_urls else False
-<<<<<<< HEAD
     prefix = args.prefix if args.prefix else None
-    no_prefix = args.no_prefix if args.no_prefix else False
-=======
     prefix_mode = args.prefix_mode
     api_prefix = args.api_prefix
->>>>>>> forkorigin/master
 
     if threads_limit > 10:
         print("Error: Using more than 10 threads may cause errors.\nDecrease the amount of used threads.")
@@ -515,11 +504,8 @@ def main():
 
         for organization in organizations:
             if include_organization_members is False:
-<<<<<<< HEAD
-                URLs.extend(getReposURLs().fromOrg(organization, username=username, token=token, prefix=prefix))
-=======
-                URLs.extend(getReposURLs(api_prefix).fromOrg(organization, username=username, token=token))
->>>>>>> forkorigin/master
+                URLs.extend(getReposURLs(api_prefix).fromOrg(organization, username=username, token=token, prefix=prefix))
+
             else:
                 URLs.extend(getReposURLs(api_prefix).fromOrgIncludeUsers(organization, username=username, token=token, include_gists=include_gists))
 
